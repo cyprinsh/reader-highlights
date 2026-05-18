@@ -5,7 +5,7 @@ from datetime import datetime
 
 st.set_page_config(page_title="북리더 통합 독서노트", page_icon="📚", layout="centered")
 st.title("📚 북리더 통합 서재 만들기")
-st.markdown("여러 개의 `.mrexpt` 파일을 올려 **단 하나의 통합 HTML 파일**로 다운로드하세요.")
+st.markdown("여러 개의 파일을 올려 **단 하나의 통합 HTML 파일**로 다운로드하세요.")
 
 # 1. 정밀 데이터 필터링 함수 (이전과 동일하게 불필요 데이터 완벽 제거)
 def parse_mrexpt(file_bytes, filename):
