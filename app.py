@@ -6,7 +6,7 @@ from datetime import datetime
 
 st.set_page_config(page_title="북리더 통합 독서노트", page_icon="📚", layout="centered")
 st.title("📚 북리더 통합 서재 만들기")
-st.markdown("PC에서는 **`.mrexpt`** 파일을, 모바일에서는 이름이 변경된 **`.txt`** 파일을 올려 단 하나의 통합 HTML 파일로 만드세요.")
+st.markdown("PC에 **파일**들을 드래그 앤 드롭하여 **단 하나의 통합 HTML 파일**로 완성하세요.")
 
 if "uploader_key" not in st.session_state:
     st.session_state.uploader_key = 0
@@ -14,11 +14,10 @@ if "uploader_key" not in st.session_state:
 if "books_db" not in st.session_state:
     st.session_state.books_db = {}
 
-# 1. 정밀 데이터 필터링 함수 (.mrexpt 및 .txt 확장자 모두 대응)
-def parse_mrexpt(file_bytes, filename):
+# 1. 정밀 데이터 필터링 함수
+def parse_backup_file(file_bytes, filename):
     try:
-        # utf-8-sig를 사용하여 BOM(보이지 않는 특수문자) 문제 해결
-        content = file_bytes.decode('utf-8-sig')
+        content = file_bytes.decode('utf-8-sig') # 특수문자(BOM) 에러 방지
     except UnicodeDecodeError:
         content = file_bytes.decode('cp949', errors='ignore')
         
@@ -26,7 +25,7 @@ def parse_mrexpt(file_bytes, filename):
     if not lines:
         return None
 
-    # 정규식을 사용하여 .mrexpt 또는 .txt 확장자를 대소문자 구분 없이 깔끔하게 제거
+    # 내부적으로 확장자 깔끔하게 숨김 처리 및 제거
     raw_title = re.sub(r'\.(mrexpt|txt)$', '', filename, flags=re.IGNORECASE).strip()
     core_title = re.split(r'[\(\-]', raw_title)[0].strip()
     
@@ -52,7 +51,6 @@ def parse_mrexpt(file_bytes, filename):
 
 # 2. 통합 HTML 생성 함수
 def generate_combined_html(books_dict):
-    # 책 제목을 기준으로 가나다순 정렬
     sorted_books = dict(sorted(books_dict.items()))
 
     html_start = """
@@ -64,41 +62,24 @@ def generate_combined_html(books_dict):
         <title>나의 통합 독서노트</title>
         <style>
             :root { --base-font-size: 16px; }
-            body { 
-                font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; 
-                line-height: 1.7; 
-                color: #2c3e50; 
-                max-width: 700px; 
-                margin: 0 auto; 
-                padding: 20px; 
-                background-color: #f5f7fa;
-                font-size: var(--base-font-size); 
-                transition: font-size 0.2s ease; 
-            }
+            body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; line-height: 1.7; color: #2c3e50; max-width: 700px; margin: 0 auto; padding: 20px; background-color: #f5f7fa; font-size: var(--base-font-size); transition: font-size 0.2s ease; }
             .container { background: #ffffff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-height: 80vh; position: relative; }
             h1 { color: #1a2a3a; text-align: center; margin-bottom: 5px; font-size: 1.8em; }
             .meta { text-align: center; color: #95a5a6; font-size: 0.9em; margin-bottom: 30px; border-bottom: 1px solid #eceff1; padding-bottom: 15px; }
-            
-            /* 검색바 스타일 */
             .search-box { width: 100%; padding: 12px 15px; margin-bottom: 25px; border: 2px solid #e0e6ed; border-radius: 8px; font-size: 1em; box-sizing: border-box; outline: none; transition: border-color 0.2s; }
             .search-box:focus { border-color: #3498db; }
-
             .font-control-panel { position: fixed; top: 20px; right: 20px; z-index: 1000; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(5px); padding: 5px; border-radius: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; gap: 2px; }
             .font-btn { background: #34495e; color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; font-weight: bold; font-size: 1.2em; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
             .font-btn:hover { background: #2c3e50; }
             .font-btn:disabled { background: #bdc3c7; cursor: not-allowed; }
-
             .view-section { display: none; padding-bottom: 80px; padding-top: 10px; }
             .view-section.active { display: block; animation: fadeIn 0.3s; }
             @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-            
             .book-card { background: #f8f9fa; border-left: 5px solid #3498db; padding: 20px; margin-bottom: 15px; border-radius: 8px; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
             .book-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.08); background: #fff; }
             .book-card h3 { margin: 0 0 8px 0; color: #2c3e50; font-size: 1.3em; }
-            
             .back-btn { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 999; background: #34495e; color: #ffffff; border: none; padding: 12px 24px; border-radius: 50px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.25); transition: all 0.2s ease; font-size: 1em; }
             .back-btn:hover { background: #2c3e50; transform: translateX(-50%) translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
-            
             .highlight-item { position: relative; background: #fffdf3; border-left: 4px solid #f1c40f; padding: 15px 20px; margin-bottom: 18px; border-radius: 0 8px 8px 0; font-size: 1.05em; word-break: break-all; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         </style>
     </head>
@@ -119,7 +100,7 @@ def generate_combined_html(books_dict):
         
         home_html += f'<div class="book-card" onclick="showDetail(\'{book_id}\')">\n'
         home_html += f'    <h3>📘 {safe_title}</h3>\n'
-        home_html += f'    <p style="color: #7f8c8d; font-size: 0.85em; margin: 0;">하이라이트: {len(data["highlights"])}개 | 최근 동기화: {data["updated_at"]}</p>\n'
+        home_html += f'    <p style="color: #7f8c8d; font-size: 0.85em; margin: 0;">하이라이트: {len(data["highlights"])}개 | 최근 추가: {data["updated_at"]}</p>\n'
         home_html += f'</div>\n'
         
         content_html += f'<div id="{book_id}" class="view-section">\n'
@@ -148,7 +129,6 @@ def generate_combined_html(books_dict):
                 var target = document.getElementById(id);
                 if(target) {
                     target.classList.add('active');
-                    // 상세 페이지 진입 시 검색창 초기화
                     var searchBox = target.querySelector('.search-box');
                     if(searchBox) { searchBox.value = ''; filterHighlights(searchBox, id); }
                 }
@@ -164,7 +144,6 @@ def generate_combined_html(books_dict):
                 try { history.pushState({view: 'home'}, '', '#home'); } catch(e) {}
             }
 
-            // 실시간 검색 필터링 기능
             function filterHighlights(inputElement, bookId) {
                 var filter = inputElement.value.toLowerCase();
                 var container = document.getElementById(bookId);
@@ -218,21 +197,21 @@ def generate_combined_html(books_dict):
     
     return html_start + home_html + content_html + script_html
 
-with st.expander("📂 여기에 백업 파일 추가하기 (.mrexpt / .txt)", expanded=not bool(st.session_state.books_db)):
+# UI에서 확장자 이름 모두 제거
+with st.expander("📂 여기에 백업 파일 끌어다 놓기", expanded=not bool(st.session_state.books_db)):
     uploaded_files = st.file_uploader(
-        "파일을 선택하거나 끌어다 놓으세요.", 
+        "마우스로 여러 개의 파일을 한 번에 드래그 앤 드롭 하세요.", 
         accept_multiple_files=True,
-        # 모바일 호환성을 위해 명시적인 type 제한을 두지 않고 파이썬 로직에서 필터링합니다.
         key=f"uploader_{st.session_state.uploader_key}"
     )
 
     if uploaded_files:
         for file in uploaded_files:
-            # .mrexpt와 .txt 파일 모두 업로드 통과
+            # 내부적으로만 확장자 필터링
             if not (file.name.lower().endswith('.mrexpt') or file.name.lower().endswith('.txt')):
                 continue
             bytes_data = file.read()
-            parsed_data = parse_mrexpt(bytes_data, file.name)
+            parsed_data = parse_backup_file(bytes_data, file.name)
             if parsed_data:
                 title = parsed_data["title"]
                 st.session_state.books_db[title] = parsed_data
@@ -240,7 +219,7 @@ with st.expander("📂 여기에 백업 파일 추가하기 (.mrexpt / .txt)", e
 st.divider()
 
 if st.session_state.books_db:
-    st.success(f"총 {len(st.session_state.books_db)}권의 책이 성공적으로 처리되었습니다.")
+    st.success(f"🎉 총 {len(st.session_state.books_db)}권의 책이 성공적으로 처리되었습니다.")
     
     combined_html_string = generate_combined_html(st.session_state.books_db)
     
@@ -254,9 +233,7 @@ if st.session_state.books_db:
     )
     
     st.write("")
-    st.markdown("### 📱 다운로드될 파일 미리보기 및 테스트")
-    st.caption("새로 추가된 검색 기능과 글씨 크기 조절을 미리 테스트해 보세요.")
-    
+    st.markdown("### 📱 다운로드될 HTML 미리보기")
     components.html(combined_html_string, height=700, scrolling=True)
     
     if st.button("🗑️ 전체 목록 초기화"):
@@ -265,4 +242,4 @@ if st.session_state.books_db:
         st.rerun()
 
 else:
-    st.info("💡 위 상자를 열어 백업 파일들을 추가하면 통합 서재가 만들어집니다.")
+    st.info("💡 위의 상자를 열어 백업 파일들을 추가하면 나만의 통합 서재가 만들어집니다.")
