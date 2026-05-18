@@ -5,7 +5,7 @@ from datetime import datetime
 
 st.set_page_config(page_title="북리더 통합 독서노트", page_icon="📚", layout="centered")
 st.title("📚 북리더 통합 서재 만들기")
-st.markdown("여러 개의 `.mrexpt` 파일을 올려 **단 하나의 통합 HTML 파일**로 다운로드하세요.")
+st.markdown("여러 개의 파일을 올려 **단 하나의 통합 HTML 파일**로 다운로드하세요.")
 
 # [오류 해결 2] 업로드 상자를 완전히 비우기 위한 고유 키(Key) 생성
 if "uploader_key" not in st.session_state:
