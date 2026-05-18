@@ -6,7 +6,7 @@ from datetime import datetime
 
 st.set_page_config(page_title="북리더 통합 독서노트", page_icon="📚", layout="centered")
 st.title("📚 북리더 통합 서재 만들기")
-st.markdown("여러 개의 **북리더 백업 파일**을 올려 **단 하나의 통합 HTML 파일**로 다운로드하세요.")
+st.markdown("PC에서는 **`.mrexpt`** 파일을, 모바일에서는 이름이 변경된 **`.txt`** 파일을 올려 단 하나의 통합 HTML 파일로 만드세요.")
 
 if "uploader_key" not in st.session_state:
     st.session_state.uploader_key = 0
@@ -14,7 +14,7 @@ if "uploader_key" not in st.session_state:
 if "books_db" not in st.session_state:
     st.session_state.books_db = {}
 
-# 1. 정밀 데이터 필터링 함수
+# 1. 정밀 데이터 필터링 함수 (.mrexpt 및 .txt 확장자 모두 대응)
 def parse_mrexpt(file_bytes, filename):
     try:
         # utf-8-sig를 사용하여 BOM(보이지 않는 특수문자) 문제 해결
@@ -26,7 +26,8 @@ def parse_mrexpt(file_bytes, filename):
     if not lines:
         return None
 
-    raw_title = filename.replace(".mrexpt", "").strip()
+    # 정규식을 사용하여 .mrexpt 또는 .txt 확장자를 대소문자 구분 없이 깔끔하게 제거
+    raw_title = re.sub(r'\.(mrexpt|txt)$', '', filename, flags=re.IGNORECASE).strip()
     core_title = re.split(r'[\(\-]', raw_title)[0].strip()
     
     highlights = []
@@ -217,16 +218,18 @@ def generate_combined_html(books_dict):
     
     return html_start + home_html + content_html + script_html
 
-with st.expander("📂 여기에 여러 파일 드래그 앤 드롭하기", expanded=not bool(st.session_state.books_db)):
+with st.expander("📂 여기에 백업 파일 추가하기 (.mrexpt / .txt)", expanded=not bool(st.session_state.books_db)):
     uploaded_files = st.file_uploader(
-        "북리더 백업 파일들을 한 번에 추가하세요.", 
+        "파일을 선택하거나 끌어다 놓으세요.", 
         accept_multiple_files=True,
+        # 모바일 호환성을 위해 명시적인 type 제한을 두지 않고 파이썬 로직에서 필터링합니다.
         key=f"uploader_{st.session_state.uploader_key}"
     )
 
     if uploaded_files:
         for file in uploaded_files:
-            if not file.name.endswith('.mrexpt'):
+            # .mrexpt와 .txt 파일 모두 업로드 통과
+            if not (file.name.lower().endswith('.mrexpt') or file.name.lower().endswith('.txt')):
                 continue
             bytes_data = file.read()
             parsed_data = parse_mrexpt(bytes_data, file.name)
