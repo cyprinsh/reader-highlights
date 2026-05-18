@@ -17,7 +17,8 @@ if "books_db" not in st.session_state:
 # 1. 정밀 데이터 필터링 함수
 def parse_mrexpt(file_bytes, filename):
     try:
-        content = file_bytes.decode('utf-8')
+        # utf-8-sig를 사용하여 BOM(보이지 않는 특수문자) 문제 해결
+        content = file_bytes.decode('utf-8-sig')
     except UnicodeDecodeError:
         content = file_bytes.decode('cp949', errors='ignore')
         
@@ -50,6 +51,9 @@ def parse_mrexpt(file_bytes, filename):
 
 # 2. 통합 HTML 생성 함수
 def generate_combined_html(books_dict):
+    # 책 제목을 기준으로 가나다순 정렬
+    sorted_books = dict(sorted(books_dict.items()))
+
     html_start = """
     <!DOCTYPE html>
     <html lang="ko">
@@ -74,6 +78,10 @@ def generate_combined_html(books_dict):
             h1 { color: #1a2a3a; text-align: center; margin-bottom: 5px; font-size: 1.8em; }
             .meta { text-align: center; color: #95a5a6; font-size: 0.9em; margin-bottom: 30px; border-bottom: 1px solid #eceff1; padding-bottom: 15px; }
             
+            /* 검색바 스타일 */
+            .search-box { width: 100%; padding: 12px 15px; margin-bottom: 25px; border: 2px solid #e0e6ed; border-radius: 8px; font-size: 1em; box-sizing: border-box; outline: none; transition: border-color 0.2s; }
+            .search-box:focus { border-color: #3498db; }
+
             .font-control-panel { position: fixed; top: 20px; right: 20px; z-index: 1000; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(5px); padding: 5px; border-radius: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; gap: 2px; }
             .font-btn { background: #34495e; color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; font-weight: bold; font-size: 1.2em; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
             .font-btn:hover { background: #2c3e50; }
@@ -101,10 +109,10 @@ def generate_combined_html(books_dict):
         <div class="container">
     """
     
-    home_html = f'<div id="home" class="view-section active">\n<h1>📚 나의 독서노트 서재</h1>\n<div class="meta">총 {len(books_dict)}권의 책이 정리되어 있습니다.</div>\n'
+    home_html = f'<div id="home" class="view-section active">\n<h1>📚 나의 독서노트 서재</h1>\n<div class="meta">총 {len(sorted_books)}권의 책이 정리되어 있습니다.</div>\n'
     content_html = ""
     
-    for idx, (title, data) in enumerate(books_dict.items()):
+    for idx, (title, data) in enumerate(sorted_books.items()):
         book_id = f"book-{idx}"
         safe_title = html.escape(title)
         
@@ -114,13 +122,16 @@ def generate_combined_html(books_dict):
         home_html += f'</div>\n'
         
         content_html += f'<div id="{book_id}" class="view-section">\n'
-        content_html += f'    <h1>📘 {safe_title}</h1><br>\n'
+        content_html += f'    <h1>📘 {safe_title}</h1>\n'
+        content_html += f'    <input type="text" class="search-box" placeholder="이 책에서 내용 검색하기..." onkeyup="filterHighlights(this, \'{book_id}\')">\n'
         
+        content_html += f'    <div class="highlight-container">\n'
         for hl in data['highlights']:
             temp_hl = re.sub(r'<[bB][rR]\s*/?>', '\n', hl)
             safe_hl = html.escape(temp_hl)
             safe_hl = safe_hl.replace('\n', '<br>')
-            content_html += f'    <div class="highlight-item">{safe_hl}</div>\n'
+            content_html += f'        <div class="highlight-item">{safe_hl}</div>\n'
+        content_html += f'    </div>\n'
             
         content_html += f'    <button class="back-btn" onclick="goHome()">⬅️ 목록으로 돌아가기</button>\n'
         content_html += f'</div>\n'
@@ -134,7 +145,12 @@ def generate_combined_html(books_dict):
                 var sections = document.querySelectorAll('.view-section');
                 for(var i=0; i<sections.length; i++) { sections[i].classList.remove('active'); }
                 var target = document.getElementById(id);
-                if(target) target.classList.add('active');
+                if(target) {
+                    target.classList.add('active');
+                    // 상세 페이지 진입 시 검색창 초기화
+                    var searchBox = target.querySelector('.search-box');
+                    if(searchBox) { searchBox.value = ''; filterHighlights(searchBox, id); }
+                }
                 window.scrollTo(0,0);
                 try { history.pushState({view: id}, '', '#' + id); } catch(e) {}
             }
@@ -145,6 +161,22 @@ def generate_combined_html(books_dict):
                 document.getElementById('home').classList.add('active');
                 window.scrollTo(0,0);
                 try { history.pushState({view: 'home'}, '', '#home'); } catch(e) {}
+            }
+
+            // 실시간 검색 필터링 기능
+            function filterHighlights(inputElement, bookId) {
+                var filter = inputElement.value.toLowerCase();
+                var container = document.getElementById(bookId);
+                var items = container.getElementsByClassName('highlight-item');
+                
+                for (var i = 0; i < items.length; i++) {
+                    var text = items[i].innerText || items[i].textContent;
+                    if (text.toLowerCase().indexOf(filter) > -1) {
+                        items[i].style.display = "";
+                    } else {
+                        items[i].style.display = "none";
+                    }
+                }
             }
 
             window.addEventListener('popstate', function(event) {
@@ -185,7 +217,6 @@ def generate_combined_html(books_dict):
     
     return html_start + home_html + content_html + script_html
 
-
 with st.expander("📂 여기에 여러 파일 드래그 앤 드롭하기", expanded=not bool(st.session_state.books_db)):
     uploaded_files = st.file_uploader(
         "북리더 백업 파일들을 한 번에 추가하세요.", 
@@ -221,7 +252,7 @@ if st.session_state.books_db:
     
     st.write("")
     st.markdown("### 📱 다운로드될 파일 미리보기 및 테스트")
-    st.caption("아래 화면 우측 상단의 '-' '+' 버튼을 눌러 글씨 크기 조절을 미리 테스트해 보세요.")
+    st.caption("새로 추가된 검색 기능과 글씨 크기 조절을 미리 테스트해 보세요.")
     
     components.html(combined_html_string, height=700, scrolling=True)
     
@@ -232,5 +263,3 @@ if st.session_state.books_db:
 
 else:
     st.info("💡 위 상자를 열어 백업 파일들을 추가하면 통합 서재가 만들어집니다.")
-
-# --- 코드 끝 ---
