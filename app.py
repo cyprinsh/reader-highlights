@@ -151,3 +151,86 @@ def generate_combined_html(books_dict):
                 var sections = document.querySelectorAll('.view-section');
                 for(var i=0; i<sections.length; i++) { sections[i].classList.remove('active'); }
                 if(event.state && event.state.view && document.getElementById(event.state.view)) {
+                    document.getElementById(event.state.view).classList.add('active');
+                } else {
+                    document.getElementById('home').classList.add('active');
+                }
+            });
+
+            const zoomLevels = [12, 14, 16, 18, 20];
+            let currentZoomIndex = 2;
+
+            function changeFontSize(delta) {
+                let newIndex = currentZoomIndex + delta;
+                if(newIndex < 0 || newIndex >= zoomLevels.length) return;
+                currentZoomIndex = newIndex;
+                const newSize = zoomLevels[currentZoomIndex];
+                document.documentElement.style.setProperty('--base-font-size', newSize + 'px');
+                updateButtonStates();
+            }
+
+            function updateButtonStates() {
+                document.getElementById('zoomOut').disabled = (currentZoomIndex === 0);
+                document.getElementById('zoomIn').disabled = (currentZoomIndex === zoomLevels.length - 1);
+            }
+
+            try { 
+                history.replaceState({view: 'home'}, '', '#home'); 
+                updateButtonStates();
+            } catch(e) {}
+        </script>
+    </body>
+    </html>
+    """
+    
+    return html_start + home_html + content_html + script_html
+
+
+with st.expander("📂 여기에 여러 파일 드래그 앤 드롭하기", expanded=not bool(st.session_state.books_db)):
+    uploaded_files = st.file_uploader(
+        "북리더 백업 파일들을 한 번에 추가하세요.", 
+        accept_multiple_files=True,
+        key=f"uploader_{st.session_state.uploader_key}"
+    )
+
+    if uploaded_files:
+        for file in uploaded_files:
+            if not file.name.endswith('.mrexpt'):
+                continue
+            bytes_data = file.read()
+            parsed_data = parse_mrexpt(bytes_data, file.name)
+            if parsed_data:
+                title = parsed_data["title"]
+                st.session_state.books_db[title] = parsed_data
+
+st.divider()
+
+if st.session_state.books_db:
+    st.success(f"총 {len(st.session_state.books_db)}권의 책이 성공적으로 처리되었습니다.")
+    
+    combined_html_string = generate_combined_html(st.session_state.books_db)
+    
+    st.download_button(
+        label="📥 전체 독서노트 통합 HTML 다운로드",
+        data=combined_html_string,
+        file_name="나의_통합_독서노트.html",
+        mime="text/html",
+        type="primary",
+        use_container_width=True
+    )
+    
+    st.write("")
+    st.markdown("### 📱 다운로드될 파일 미리보기 및 테스트")
+    st.caption("아래 화면 우측 상단의 '-' '+' 버튼을 눌러 글씨 크기 조절을 미리 테스트해 보세요.")
+    
+    components.html(combined_html_string, height=700, scrolling=True)
+    
+    if st.button("🗑️ 전체 목록 초기화"):
+        st.session_state.books_db = {}
+        st.session_state.uploader_key += 1
+        st.rerun()
+
+else:
+    st.info("💡 위 상자를 열어 백업 파일들을 추가하면 통합 서재가 만들어집니다.")
+
+# --- 코드 끝 ---
