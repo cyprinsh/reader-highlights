@@ -1,7 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import re
-import html # [핵심 추가] 특수기호를 안전하게 변환하는 모듈
+import html
 from datetime import datetime
 
 st.set_page_config(page_title="북리더 통합 독서노트", page_icon="📚", layout="centered")
@@ -88,4 +88,66 @@ def generate_combined_html(books_dict):
             .book-card h3 { margin: 0 0 8px 0; color: #2c3e50; font-size: 1.3em; }
             
             .back-btn { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 999; background: #34495e; color: #ffffff; border: none; padding: 12px 24px; border-radius: 50px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.25); transition: all 0.2s ease; font-size: 1em; }
-            .back-btn:hover { background: #2c3e50; transform: translateX(-50%) translateY(-3px); box-shadow:
+            .back-btn:hover { background: #2c3e50; transform: translateX(-50%) translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
+            
+            .highlight-item { position: relative; background: #fffdf3; border-left: 4px solid #f1c40f; padding: 15px 20px; margin-bottom: 18px; border-radius: 0 8px 8px 0; font-size: 1.05em; word-break: break-all; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        </style>
+    </head>
+    <body>
+        <div class="font-control-panel">
+            <button class="font-btn" id="zoomOut" onclick="changeFontSize(-1)" title="글씨 축소">-</button>
+            <button class="font-btn" id="zoomIn" onclick="changeFontSize(1)" title="글씨 확대">+</button>
+        </div>
+        <div class="container">
+    """
+    
+    home_html = f'<div id="home" class="view-section active">\n<h1>📚 나의 독서노트 서재</h1>\n<div class="meta">총 {len(books_dict)}권의 책이 정리되어 있습니다.</div>\n'
+    content_html = ""
+    
+    for idx, (title, data) in enumerate(books_dict.items()):
+        book_id = f"book-{idx}"
+        safe_title = html.escape(title)
+        
+        home_html += f'<div class="book-card" onclick="showDetail(\'{book_id}\')">\n'
+        home_html += f'    <h3>📘 {safe_title}</h3>\n'
+        home_html += f'    <p style="color: #7f8c8d; font-size: 0.85em; margin: 0;">하이라이트: {len(data["highlights"])}개 | 최근 동기화: {data["updated_at"]}</p>\n'
+        home_html += f'</div>\n'
+        
+        content_html += f'<div id="{book_id}" class="view-section">\n'
+        content_html += f'    <h1>📘 {safe_title}</h1><br>\n'
+        
+        for hl in data['highlights']:
+            temp_hl = re.sub(r'<[bB][rR]\s*/?>', '\n', hl)
+            safe_hl = html.escape(temp_hl)
+            safe_hl = safe_hl.replace('\n', '<br>')
+            content_html += f'    <div class="highlight-item">{safe_hl}</div>\n'
+            
+        content_html += f'    <button class="back-btn" onclick="goHome()">⬅️ 목록으로 돌아가기</button>\n'
+        content_html += f'</div>\n'
+        
+    home_html += "</div>\n"
+    
+    script_html = """
+        </div>
+        <script>
+            function showDetail(id) {
+                var sections = document.querySelectorAll('.view-section');
+                for(var i=0; i<sections.length; i++) { sections[i].classList.remove('active'); }
+                var target = document.getElementById(id);
+                if(target) target.classList.add('active');
+                window.scrollTo(0,0);
+                try { history.pushState({view: id}, '', '#' + id); } catch(e) {}
+            }
+
+            function goHome() {
+                var sections = document.querySelectorAll('.view-section');
+                for(var i=0; i<sections.length; i++) { sections[i].classList.remove('active'); }
+                document.getElementById('home').classList.add('active');
+                window.scrollTo(0,0);
+                try { history.pushState({view: 'home'}, '', '#home'); } catch(e) {}
+            }
+
+            window.addEventListener('popstate', function(event) {
+                var sections = document.querySelectorAll('.view-section');
+                for(var i=0; i<sections.length; i++) { sections[i].classList.remove('active'); }
+                if(event.state && event.state.view && document.getElementById(event.state.view)) {
