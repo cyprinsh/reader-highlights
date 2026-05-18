@@ -151,7 +151,7 @@ def generate_combined_html(books_dict):
 # uploader_key를 동적으로 할당하여 초기화 시 업로드 상자를 완전히 비움
 with st.expander("📂 여기에 여러 파일 드래그 앤 드롭하기", expanded=not bool(st.session_state.books_db)):
     uploaded_files = st.file_uploader(
-        "문리더 백업 파일(.mrexpt)들을 한 번에 추가하세요.", 
+        "북리더 백업 파일들을 한 번에 추가하세요.", 
         type=["mrexpt"], 
         accept_multiple_files=True,
         key=f"uploader_{st.session_state.uploader_key}" # 동적 키 적용
@@ -195,4 +195,4 @@ if st.session_state.books_db:
         st.rerun()                              # 3. 화면 새로고침
 
 else:
-    st.info("💡 위 상자를 열어 .mrexpt 파일들을 추가하면 통합 서재가 만들어집니다.")
+    st.info("💡 위 상자를 열어 파일들을 추가하면 통합 서재가 만들어집니다.")
